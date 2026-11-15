@@ -1,0 +1,35 @@
+asm_id	species	accession_label	ploidy	genomes	source	ensembl_name	accession	include	note	genome_fasta	pep_fasta	gff3
+Tu_G1812	Triticum urartu	G1812 (Tu2.0)	2	A	ensembl	triticum_urartu	GCA_003073215.1	yes				
+Tm_TA299	Triticum monococcum	TA299 v1.1	2	A	ncbi		GCA_057428605.1	yes	no GFF3 on NCBI			
+Tm_TA10622	Triticum monococcum	TA10622 v1.1	2	A	ncbi		GCA_057380995.1	yes	no GFF3 on NCBI			
+Asp_TS01	Aegilops speltoides	TS01	2	S	ncbi		GCA_021437245.1	yes	no GFF3 on NCBI			
+Ash_TH01	Aegilops sharonensis	TH01	2	S	ncbi		GCA_021641835.1	yes	no GFF3 on NCBI			
+Alo_TL01	Aegilops longissima	TL01	2	S	ncbi		GCA_021605205.1	yes	no GFF3 on NCBI			
+Ase_TE01	Aegilops searsii	TE01	2	S	ncbi		GCA_021605185.1	yes	no GFF3 on NCBI			
+Abi_TB01	Aegilops bicornis	TB01	2	S	ncbi		GCA_021605145.1	yes	no GFF3 on NCBI			
+Aet_AL878	Aegilops tauschii	AL8/78 (Aet v4.0)	2	D	ensembl	aegilops_tauschii	GCA_002575655.1	yes				
+Aet_Ent076	Aegilops tauschii	Ent-076 hap1	2	D	ncbi		GCA_965151635.1	yes	no GFF3; lineage must be confirmed from BioSample			
+Aet_Ent118	Aegilops tauschii	Ent-118 hap1	2	D	ncbi		GCA_965151605.1	yes	no GFF3; lineage must be confirmed from BioSample			
+Tdic_Zavitan	Triticum turgidum ssp. dicoccoides	Zavitan (WEWSeq v1.0)	4	AB	ensembl	triticum_dicoccoides	GCA_002162155.1	yes				
+Tdur_Svevo	Triticum turgidum ssp. durum	Svevo v1	4	AB	ensembl	triticum_turgidum	GCA_900231445.1	yes				
+Tdur_Kronos	Triticum turgidum ssp. durum	Kronos v1.1	4	AB	ncbi		GCA_057814425.1	yes	no GFF3 on NCBI			
+Tae_CSv21	Triticum aestivum	Chinese Spring RefSeq v2.1	6	ABD	ensembl	triticum_aestivum_refseqv2	GCA_018294505.1	yes				
+Tae_Fielder	Triticum aestivum	Fielder v1	6	ABD	ncbi		GCA_907166925.1	yes	no GFF3 on NCBI			
+Tae_Kariega	Triticum aestivum	Kariega v1	6	ABD	ensembl	triticum_aestivum_kariega	GCA_910594105.1	yes				
+Tae_ArinaLrFor	Triticum aestivum	ArinaLrFor	6	ABD	ensembl	triticum_aestivum_arinalrfor	GCA_903993985.1	yes				
+Tae_Julius	Triticum aestivum	Julius	6	ABD	ensembl	triticum_aestivum_julius	GCA_903994195.1	yes				
+Tae_Mace	Triticum aestivum	Mace	6	ABD	ensembl	triticum_aestivum_mace	GCA_903994175.1	yes				
+Tae_Landmark	Triticum aestivum	CDC Landmark	6	ABD	ensembl	triticum_aestivum_landmark	GCA_903995565.1	yes				
+Tae_Norin61	Triticum aestivum	Norin 61	6	ABD	ensembl	triticum_aestivum_norin61	GCA_904066035.1	yes				
+Tae_Stanley	Triticum aestivum	CDC Stanley	6	ABD	ensembl	triticum_aestivum_stanley	GCA_903994155.1	yes				
+Tae_Jagger	Triticum aestivum	Jagger	6	ABD	ensembl	triticum_aestivum_jagger	GCA_903993795.1	yes				
+Tae_Mattis	Triticum aestivum	SY Mattis	6	ABD	ensembl	triticum_aestivum_mattis	GCA_903994185.1	yes				
+Tae_Lancer	Triticum aestivum	LongReach Lancer	6	ABD	ensembl	triticum_aestivum_lancer	GCA_903993975.1	yes	10+ Wheat Genomes; not named in your Methods			
+Tsp_PI190962	Triticum aestivum ssp. spelta	PI190962	6	ABD	ensembl	triticum_spelta	GCA_903994165.1	yes	10+ Wheat Genomes; not named in your Methods			
+Ttim	Triticum timopheevii	WRC timopheevii	4	AG	ensembl	triticum_timopheevii	GCA_963921465.1	no	optional			
+Aum_TA1851	Aegilops umbellulata	TA1851	2	U	ensembl	aegilops_umbellulata	GCA_032464435.1	no	optional; Lr9 donor species			
+Asp_Tivon	Aegilops speltoides	Tivon	2	S	ncbi		GCA_944222845.1	no	optional second speltoides			
+Ash_1644	Aegilops sharonensis	1644	2	S	ncbi		GCA_904067115.1	no	optional second sharonensis			
+Alo_6782v2	Aegilops longissima	AEG-6782-2 v2	2	S	ncbi		GCA_964264335.1	no	optional second longissima			
+Tm_PI306540	Triticum monococcum	PI 306540	2	A	ncbi		GCA_034509565.1	no	optional third einkorn			
+Sce_Lo7	Secale cereale	Lo7	2	R	ensembl	secale_cereale	GCA_902687465.1	no	optional outgroup			

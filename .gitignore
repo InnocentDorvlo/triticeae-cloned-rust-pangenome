@@ -1,0 +1,26 @@
+# OS & editor files
+.DS_Store
+.DS_Store?
+._*
+.idea/
+.vscode/
+*~
+
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Generated datasets, intermediates & large raw genomes
+genomes/
+*.fa.gz
+*.fna.gz
+work/
+results/
+tables/
+figures/
+logs/
+busco_downloads/
+*.log
+*.docx
+*.xlsx

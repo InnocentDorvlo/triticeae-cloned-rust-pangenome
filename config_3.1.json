@@ -1,0 +1,22 @@
+{
+  "threads": 4,
+  "workdir": "work",
+  "resultsdir": "results",
+  "panel": "panel_3.1.tsv",
+  "catalogue": "catalogue_3.1.tsv",
+  "queries": "queries_3.1.faa",
+  "ensembl_release": 63,
+  "miniprot": {"max_intron": "30k", "outn": 100, "outs": 0.70},
+  "candidate": {"min_identity": 0.50, "min_qcov": 0.50},
+  "homolog":   {"min_identity": 0.80, "min_qcov": 0.80},
+  "intact":    {"min_qcov": 0.80},
+  "sweep_identity": [0.70, 0.75, 0.80, 0.85, 0.90, 0.95],
+  "sweep_qcov": 0.80,
+  "diamond": {"evalue": 1e-10, "max_target_seqs": 500},
+  "hmmscan_domE": 1e-5,
+  "orthofinder": {"search": "diamond_ultra_sens", "inflation": 1.5},
+  "compartments": {"core": 0.95, "softcore": 0.80, "shell": 0.15},
+  "nlr_annotator": {"enabled": false, "java_mem": "10g"},
+  "small_seq_batch_bp": 400000000,
+  "keep_genomes": false
+}

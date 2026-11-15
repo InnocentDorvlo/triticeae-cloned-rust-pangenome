@@ -1,0 +1,18 @@
+name: rust31
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.11
+  - numpy
+  - scipy
+  - miniprot>=0.13
+  - diamond>=2.1
+  - hmmer=3.4
+  - bedtools=2.31
+  - orthofinder=2.5.5
+  - openjdk=17          # only needed for NLR-Annotator
+  - r-base=4.3
+  - r-vegan
+  - r-micropan
+  - curl
