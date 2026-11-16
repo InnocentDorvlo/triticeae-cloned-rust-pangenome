@@ -44,13 +44,26 @@ res_dir  <- file.path(base_dir, "results")
 fig_dir  <- file.path(base_dir, "figures")
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 
-# Color palettes
+# Color palettes (harmonized across Panel a Ploidy dots, Panel a A/B/D clades, and Panel f tracks)
+ploidy_colors <- c(
+  "Diploid (2x)"    = "#2ca02c",
+  "Tetraploid (4x)" = "#1f77b4",
+  "Hexaploid (6x)"  = "#ff7f0e"
+)
+
+subgenome_colors <- c(
+  "A" = "#e41a1c",
+  "S" = "#f781bf",
+  "B" = "#984ea3",
+  "D" = "#4daf4a"
+)
+
 tier_colors <- c(
-  "Diploid A (2x)"     = "#e41a1c",
-  "Diploid S (2x)"     = "#ff7f00",
-  "Diploid D (2x)"     = "#4daf4a",
-  "Tetraploid AB (4x)" = "#984ea3",
-  "Hexaploid ABD (6x)" = "#377eb8"
+  "Diploid A (2x)"     = "#74c476",
+  "Diploid S (2x)"     = "#2ca02c",
+  "Diploid D (2x)"     = "#006d2c",
+  "Tetraploid AB (4x)" = "#1f77b4",
+  "Hexaploid ABD (6x)" = "#ff7f0e"
 )
 
 compartment_colors <- c(
@@ -67,14 +80,7 @@ rescue_colors <- c(
   "Rescued (split model)"  = "#7570b3"
 )
 
-pav_colors <- c(
-  "Diploid A (2x)"     = "#e41a1c",
-  "Diploid S (2x)"     = "#ff7f00",
-  "Diploid D (2x)"     = "#4daf4a",
-  "Tetraploid AB (4x)" = "#984ea3",
-  "Hexaploid ABD (6x)" = "#377eb8",
-  "Absent"             = "#f0f0f0"
-)
+pav_colors <- c(tier_colors, "Absent" = "#f0f0f0")
 
 # ------------------------------------------------------------------------------
 # 1. Load Metadata & Presence Matrix
@@ -510,7 +516,18 @@ col_map <- subg_meta %>%
   mutate(subgenome = factor(subgenome, levels = subg_order)) %>%
   arrange(subgenome) %>%
   mutate(x_idx = row_number()) %>%
-  left_join(s2_df %>% select(asm_id, annotation_gff3) %>% distinct(), by = "asm_id")
+  left_join(s2_df %>% select(asm_id, annotation_gff3) %>% distinct(), by = "asm_id") %>%
+  mutate(
+    Ploidy_Label = factor(
+      case_when(
+        ploidy == 2 ~ "Diploid (2x)",
+        ploidy == 4 ~ "Tetraploid (4x)",
+        TRUE        ~ "Hexaploid (6x)"
+      ),
+      levels = names(ploidy_colors)
+    ),
+    Sub_Label = factor(sub, levels = names(subgenome_colors))
+  )
 
 short_asm_name <- function(a, gff) {
   nm <- sub("^T(ae|sp)_", "", a)
@@ -575,24 +592,66 @@ n_sc   <- sum(og_waterfall$pct_occupancy >= 80)
 n_sh   <- sum(og_waterfall$pct_occupancy >= 15)
 n_tot_og <- nrow(og_waterfall)
 
-# Top ploidy strip locked strictly to x = 0.5..56.5
-p_f_strip <- ggplot(col_map, aes(x = x_idx, y = 1, fill = Tier)) +
-  geom_tile(width = 1, height = 1, color = "white", linewidth = 0.12) +
-  geom_vline(xintercept = tier_bounds, color = "white", linewidth = 0.9) +
-  scale_fill_manual(values = pav_colors[names(pav_colors) != "Absent"], name = "Ploidy Tier:") +
+# Top dual-track strip (Ploidy matching Panel a dots + Subgenome matching Panel a clades)
+ploidy_blocks <- col_map %>%
+  group_by(Ploidy_Label) %>%
+  summarise(
+    xmin = min(x_idx) - 0.5,
+    xmax = max(x_idx) + 0.5,
+    xmid = mean(x_idx),
+    n_sub = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(txt = case_when(
+    Ploidy_Label == "Diploid (2x)"    ~ sprintf("2x (%d)", n_sub),
+    Ploidy_Label == "Tetraploid (4x)" ~ sprintf("4x (%d)", n_sub),
+    TRUE                              ~ sprintf("6x Hexaploid (%d)", n_sub)
+  ))
+
+subg_blocks <- col_map %>%
+  filter(Ploidy_Label == "Diploid (2x)") %>%
+  group_by(Sub_Label) %>%
+  summarise(xmid = mean(x_idx), .groups = "drop")
+
+ploidy_bounds <- col_map %>%
+  group_by(Ploidy_Label) %>%
+  summarise(x_end = max(x_idx), .groups = "drop") %>%
+  filter(x_end < nrow(col_map)) %>%
+  pull(x_end) + 0.5
+
+p_f_strip <- ggplot() +
+  geom_tile(data = col_map, aes(x = x_idx, y = 2, fill = Ploidy_Label),
+            width = 1, height = 0.92, color = "white", linewidth = 0.12) +
+  geom_text(data = ploidy_blocks, aes(x = xmid, y = 2, label = txt),
+            color = "white", fontface = "bold", size = 2.2) +
+  geom_tile(data = col_map, aes(x = x_idx, y = 1, fill = Sub_Label),
+            width = 1, height = 0.92, color = "white", linewidth = 0.12) +
+  geom_text(data = subg_blocks, aes(x = xmid, y = 1, label = as.character(Sub_Label)),
+            color = "white", fontface = "bold", size = 2.0) +
+  geom_vline(xintercept = ploidy_bounds, color = "white", linewidth = 0.95) +
+  scale_fill_manual(
+    values = c(ploidy_colors, subgenome_colors),
+    breaks = names(subgenome_colors),
+    labels = paste0(names(subgenome_colors), " subgenome"),
+    name = "Subgenome:"
+  ) +
   scale_x_continuous(limits = c(0.5, nrow(col_map) + 0.5), expand = c(0, 0)) +
-  scale_y_continuous(limits = c(0.5, 1.5), expand = c(0, 0)) +
-  labs(title = sprintf("f  Copy-number-resolved waterfall across 27 assemblies (%d OGs x 56 subgenomes)", n_tot_og)) +
-  theme_void(base_size = 9.5) +
+  scale_y_continuous(limits = c(0.5, 2.5), expand = c(0, 0), breaks = c(1, 2), labels = c("Subg.", "Ploidy")) +
+  labs(title = sprintf("f  Copy-number-resolved waterfall across 27 assemblies (%d OGs x 56 subgenomes)", n_tot_og), x = NULL, y = NULL) +
+  theme_minimal(base_size = 9.0) +
   theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_text(size = 6.2, face = "bold", color = "black", margin = margin(r = 2)),
     plot.title = element_text(face = "bold", size = 10, hjust = 0, margin = margin(b = 2)),
     plot.title.position = "plot",
     legend.position = "top",
-    legend.title = element_text(size = 7.5, face = "bold"),
+    legend.title = element_text(size = 7.3, face = "bold"),
     legend.text = element_text(size = 7.0),
-    legend.key.size = unit(0.26, "cm"),
-    legend.margin = margin(t = 0, b = 2),
-    plot.margin = margin(t = 2, r = 1, b = 1, l = 2)
+    legend.key.size = unit(0.24, "cm"),
+    legend.margin = margin(t = 0, b = 1),
+    plot.margin = margin(t = 2, r = 2, b = 1, l = 2)
   ) +
   guides(fill = guide_legend(nrow = 1))
 
@@ -702,7 +761,7 @@ right_col <- wrap_plots(
   E = p_f_occ,
   design = right_design,
   widths = c(1.0, 0.38),
-  heights = c(0.40, 0.045, 1.0)
+  heights = c(0.40, 0.068, 1.0)
 )
 
 master_fig1 <- (left_col | right_col) +
