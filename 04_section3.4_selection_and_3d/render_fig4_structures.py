@@ -5,7 +5,9 @@ Generates ray-traced, publication-quality 3D structure panels using PyMOL
 for Figure 4 (Sr35 LRR positive selection surface & Yr15 tandem kinase asymmetry).
 """
 
+import csv
 import os
+import re
 import sys
 
 # Initialize PyMOL in headless batch mode
@@ -17,8 +19,21 @@ pymol.finish_launching(['pymol', '-cq'])
 stage_dir = os.path.dirname(os.path.abspath(__file__))
 base_dir = os.path.dirname(stage_dir)
 af3_dir = os.path.join(base_dir, "work/af3")
+s10e_path = os.path.join(base_dir, "results/Supplementary_Table_S10e_af_surface_mapping.tsv")
 out_dir = os.path.join(base_dir, "figures/structures")
 os.makedirs(out_dir, exist_ok=True)
+
+
+def load_s10e_sites(gene_name):
+    """Load selected_pdb_residues for a gene from S10e."""
+    with open(s10e_path, newline="") as fh:
+        for row in csv.DictReader(fh, delimiter="\t"):
+            if row["gene"] == gene_name:
+                nums = [re.search(r"\d+", tok).group(0)
+                        for tok in row["selected_pdb_residues"].split(",")
+                        if re.search(r"\d+", tok)]
+                return nums
+    raise RuntimeError(f"{gene_name} not found in {s10e_path}")
 
 print("=======================================================================")
 print("   Rendering 3D AlphaFold Models via PyMOL (Headless Ray Tracing)")
@@ -56,9 +71,10 @@ cmd.color("slate", "Sr35 and resi 1-160")
 cmd.color("lightblue", "Sr35 and resi 161-510")
 cmd.color("grey85", "Sr35 and resi 511-919")
 
-# Selection sites from Supplementary Table S10e:
-# E317, N729, R730, K754, V798, W803, I835, V883, D885, S888, R893
-sel_resi = "317+729+730+754+798+803+835+883+885+888+893"
+# Selection sites loaded dynamically from Supplementary Table S10e:
+sr35_nums = load_s10e_sites("Sr35")
+sel_resi = "+".join(sr35_nums)
+print(f"  Sr35 selected sites loaded from S10e: {len(sr35_nums)}")
 cmd.select("sr35_sites", f"Sr35 and resi {sel_resi}")
 
 # Show cartoon and semi-transparent surface on LRR
@@ -67,7 +83,7 @@ cmd.show("surface", "Sr35 and resi 511-919")
 cmd.set("transparency", 0.65, "Sr35 and resi 511-919")
 
 # Show selected sites as distinct red spheres
-cmd.show("spheres", "sr35_sites and sidechain")
+cmd.show("spheres", "sr35_sites and (sidechain or (resn GLY and name CA))")
 cmd.color("firebrick", "sr35_sites")
 cmd.set("sphere_scale", 0.85, "sr35_sites")
 
@@ -133,15 +149,17 @@ if os.path.exists(yr27_pdb):
     cmd.color("lightblue", "Yr27 and resi 1-568")
     cmd.color("grey85", "Yr27 and resi 569-1072")
     
-    # Selected sites from S10e for Yr27
-    yr27_sel = "8+31+155+217+418+419+472+546+550+597+631+789+792+806+825+846+870+874+876+903+930+931+934+954+956+968+982+1026+1044+1048"
+    # Selected sites loaded dynamically from S10e for Yr27
+    yr27_nums = load_s10e_sites("Yr27")
+    yr27_sel = "+".join(yr27_nums)
+    print(f"  Yr27 selected sites loaded from S10e: {len(yr27_nums)}")
     cmd.select("yr27_sites", f"Yr27 and resi {yr27_sel}")
     
     cmd.show("cartoon", "Yr27")
     cmd.show("surface", "Yr27 and resi 569-1072")
     cmd.set("transparency", 0.65, "Yr27 and resi 569-1072")
     
-    cmd.show("spheres", "yr27_sites and sidechain")
+    cmd.show("spheres", "yr27_sites and (sidechain or (resn GLY and name CA))")
     cmd.color("firebrick", "yr27_sites")
     cmd.set("sphere_scale", 0.85, "yr27_sites")
     

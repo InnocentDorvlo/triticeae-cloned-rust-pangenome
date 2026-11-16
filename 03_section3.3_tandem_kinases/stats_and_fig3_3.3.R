@@ -562,7 +562,8 @@ draw_fig3 <- function() {
          pch = c(23, 17, 24), pt.bg = c("#08519c", NA, "#74c476"),
          col = c("white", "#00441b", "#006d2c"), pt.cex = c(1.1, 1.0, 0.85), cex = 0.62, bty = "n")
 
-  text(1.5, 102, sprintf("Locus mean: 66.0%% vs 34.5%% (Welch P = 0.0060)\nAll pairs (n=515): MWU P = 2.3e-76 | Genomic pS: P = 1.1e-04"),
+  ps_g_mwu_p <- wilcox.test(ps_g_dup, ps_g_fus)$p.value
+  text(1.5, 102, sprintf("Locus mean: 66.0%% vs 34.5%% (Welch P = 0.0060)\nAll pairs (n=515): MWU P = 2.3e-76 | Genomic pS: P = %.1e", ps_g_mwu_p),
        cex = 0.64, font = 1, col = "grey15")
 
   # ---- Panel d: Architecture presence across 27 assemblies ----

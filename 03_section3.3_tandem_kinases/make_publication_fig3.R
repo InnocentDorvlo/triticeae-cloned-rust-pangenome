@@ -347,6 +347,8 @@ p_c1 <- ggplot(s8c_clean, aes(x = Origin, y = aa_identity_pct, fill = Origin)) +
   guides(fill = "none")
 
 s8c_ps <- s8c_clean %>% filter(!is.na(pS) & is.finite(pS))
+ps_ref_t <- t.test(pS ~ Origin, data = subset(s8c_ps, Rec_Type == "Cloned Ref (n=6)"))
+ps_gen_w <- wilcox.test(pS ~ Origin, data = subset(s8c_ps, Rec_Type != "Cloned Ref (n=6)"))
 
 p_c2 <- ggplot(s8c_ps, aes(x = Origin, y = pS, fill = Origin)) +
   geom_boxplot(outlier.shape = NA, alpha = 0.65, width = 0.48, color = "black", linewidth = 0.4) +
@@ -355,7 +357,8 @@ p_c2 <- ggplot(s8c_ps, aes(x = Origin, y = pS, fill = Origin)) +
   geom_point(data = subset(s8c_ps, Rec_Type == "Cloned Ref (n=6)"),
              aes(shape = Rec_Type), size = 2.7, fill = "#e41a1c", color = "black", stroke = 0.5) +
   annotate("text", x = 1.5, y = 1.03,
-           label = "Ref Welch t = -10.46, P = 7.13e-04\nAll CDS MWU P = 1.08e-04",
+           label = sprintf("Ref Welch t = %.2f, P = %.2e\nGenomic CDS MWU P = %.2e",
+                           as.numeric(ps_ref_t$statistic), ps_ref_t$p.value, ps_gen_w$p.value),
            size = 2.55, fontface = "bold", color = "#b30000") +
   scale_fill_manual(values = c("Intragenic Dup" = "#9ecae1", "Intergenic Fusion" = "#fdd0a2")) +
   scale_shape_manual(values = c("Cloned Ref (n=6)" = 23, "Pangenome Homologue" = 21)) +

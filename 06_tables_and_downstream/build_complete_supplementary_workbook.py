@@ -278,7 +278,7 @@ TABLE_SPECS = [
         "sheet": "Supplementary Table 10g",
         "file": "Supplementary_Table_S10g_Site_Table.tsv",
         "section": "Section 3.4",
-        "title": "Complete codon-by-codon site selection table (32,282 codons) with PAML BEB PP, HyPhy MEME P-values, and FUBAR alpha/beta rates",
+        "title": "Complete codon-by-codon site selection table (31,618 codons) with PAML BEB PP, HyPhy MEME P-values, and FUBAR alpha/beta rates",
     },
     {
         "id": "Supplementary Table 11a",

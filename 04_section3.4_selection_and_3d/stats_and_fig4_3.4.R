@@ -214,7 +214,7 @@ audit_tbl <- data.frame(
     "Mann-Whitney U test: Classes I-II LRR domain partitions (n=20 across 20 OGs) vs Classes III-V core functional domain partitions (n=19 across 11 OGs, excluding 3 accessory domains)",
     "Kruskal-Wallis test across NLR domain partitions: CC/ID (n=20) vs NB-ARC (n=20) vs LRR (n=20)",
     "Mann-Whitney U test: NLR LRR (n=20) vs NLR NB-ARC (n=20)",
-    "Exploratory sensitivity test (n=4-5 CDS subsets): Mann-Whitney U test of PAML M8 BEB (PP>=0.95) sites: NLR (n=20) vs non-NLR (n=11)",
+    "Full multi-assembly alignment test (n=4-26 CDS): Mann-Whitney U test of PAML M8 BEB (PP>=0.95) sites: NLR (n=20) vs non-NLR (n=11)",
     "Primary full-orthogroup site-level test: Mann-Whitney U test of HyPhy MEME (P<0.05) diversifying sites: NLR (n=20) vs non-NLR (n=11)",
     "Mann-Whitney U test: FUBAR purifying codons (%) in non-NLR domain partitions (n=22, including 3 Class III accessory domains) vs NLR LRR (n=20)",
     "Mann-Whitney U test on site-level FUBAR beta-alpha: Yr15 K1_active vs K2_pseudokinase",
@@ -406,7 +406,9 @@ draw_fig4 <- function() {
     text(2 + 0.08, y2, sprintf("%s: %.3f", gene, mod2_w[i]), adj = 0, cex = 0.82, font = 2, col = "grey15")
   }
 
-  text(1.5, 0.94, "Module asymmetry is locus-specific:\nYr15, Sr60, Lr9, Sr43: Pseudokinase/Accessory w elevated\nSr62: Inverse polarity (K1_active w=0.794 > K2_pseudo w=0.412)",
+  sr62_row <- s10d[s10d$reference_query == "Sr62", ][1, ]
+  text(1.5, 0.94, sprintf("Module asymmetry is locus-specific:\nYr15, Lr9, Sr43 (+modest Sr60): Pseudokinase/Accessory w elevated\nSr62: Inverse polarity (K1_active w=%.3f > K2_pseudo w=%.3f)",
+                           as.numeric(sr62_row$module_1_omega_M0), as.numeric(sr62_row$module_2_omega_M0)),
        cex = 0.82, font = 3, col = "grey10")
   mtext("c  Class III Tandem Kinase Module Selection Asymmetry", side = 3, line = 1.0, adj = 0, font = 2, cex = 0.96)
 
@@ -452,7 +454,7 @@ draw_fig4 <- function() {
   }
   legend(0, 27.2, legend = c("LRR Concave Beta-Sheet (Solvent-Exposed)", "Other Surface / Loop / Pore-Lining Sites"),
          fill = c("#D55E00", "#56B4E9"), border = "grey15", cex = 0.80, horiz = TRUE, bty = "n")
-  mtext("d  AlphaFold 3D Surface Localization (Pooled OR = 6.16, P = 6.6e-15)",
+  mtext(sprintf("d  AlphaFold 3D Surface Localization (Pooled OR = %.2f, P = %.2e)", or_pool_mle, ft_pool$p.value),
         side = 3, line = 1.0, adj = 0, font = 2, cex = 0.96)
 
   mtext("Figure 4 | Contrasting Purifying and Diversifying Selection Regimes Across 3D Protein Architectures",

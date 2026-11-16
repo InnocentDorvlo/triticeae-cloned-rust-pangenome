@@ -556,19 +556,42 @@ def step_hyphy(ctx):
             continue
             
         fubar_json = d / "fubar.json"
+        fubar_cache = d / f"{aln_nt.name}.FUBAR.cache"
         meme_json = d / "meme.json"
-        
-        if ctx.force or not fubar_json.exists() or fubar_json.stat().st_size < 100:
+
+        fubar_stale = (
+            ctx.force
+            or not fubar_json.exists()
+            or fubar_json.stat().st_size < 100
+            or fubar_json.stat().st_mtime < aln_nt.stat().st_mtime
+            or (fubar_cache.exists() and fubar_cache.stat().st_mtime < aln_nt.stat().st_mtime)
+        )
+        if fubar_stale:
             if fubar_json.exists():
                 fubar_json.unlink()
+            # HyPhy FUBAR reuses <aln>.FUBAR.cache automatically; remove stale caches to avoid grid dimension mismatches
+            if fubar_cache.exists():
+                fubar_cache.unlink()
             cmd_fubar = [hyphy_bin, "fubar", "--alignment", str(aln_nt), "--tree", str(tree_file), "--output", str(fubar_json)]
-            subprocess.run(cmd_fubar, capture_output=True)
-            
-        if ctx.force or not meme_json.exists() or meme_json.stat().st_size < 100:
+            res_f = subprocess.run(cmd_fubar, capture_output=True, text=True)
+            if res_f.returncode != 0 or not fubar_json.exists() or fubar_json.stat().st_size < 100:
+                err_tail = (res_f.stderr or res_f.stdout or "").strip()[-400:]
+                raise RuntimeError(f"HyPhy FUBAR failed for {og} (rc={res_f.returncode}): {err_tail}")
+
+        meme_stale = (
+            ctx.force
+            or not meme_json.exists()
+            or meme_json.stat().st_size < 100
+            or meme_json.stat().st_mtime < aln_nt.stat().st_mtime
+        )
+        if meme_stale:
             if meme_json.exists():
                 meme_json.unlink()
             cmd_meme = [hyphy_bin, "meme", "--alignment", str(aln_nt), "--tree", str(tree_file), "--output", str(meme_json), "CPU=4"]
-            subprocess.run(cmd_meme, capture_output=True)
+            res_m = subprocess.run(cmd_meme, capture_output=True, text=True)
+            if res_m.returncode != 0 or not meme_json.exists() or meme_json.stat().st_size < 100:
+                err_tail = (res_m.stderr or res_m.stdout or "").strip()[-400:]
+                raise RuntimeError(f"HyPhy MEME failed for {og} (rc={res_m.returncode}): {err_tail}")
             
         n_codons = 0
         n_purifying_p95 = 0
@@ -694,6 +717,7 @@ def step_stats(ctx):
     vals["kw_intra_nlr_H"] = f"{kw_nlr_h:.2f}"
     vals["kw_intra_nlr_P"] = f"{kw_nlr_p:.4e}"
     u_lrr_nb, p_lrr_nb = ss.mannwhitneyu(nlr_lrr_w, nlr_nbarc_w, alternative="two-sided")
+    vals["mwu_lrr_vs_nbarc_U"] = f"{u_lrr_nb:.1f}"
     vals["mwu_lrr_vs_nbarc_P"] = f"{p_lrr_nb:.4e}"
     
     # Medians and IQRs (using R type 7 / linear percentile)
@@ -740,13 +764,30 @@ def step_stats(ctx):
     vals["classIV_lr14a_median_w"] = f"{np.median(c4_dom_w):.3f}"
     vals["classV_apr_median_w"] = f"{np.median(c5_dom_w):.3f}"
     
-    # Non-NLR FUBAR purifying percentage mean +/- s.e.m.
+    # Non-NLR FUBAR purifying percentage mean +/- s.e.m. (orthogroup & domain level)
     non_nlr_pur = [float(r["pct_fubar_purifying"]) for r in s10b if r["structural_class"] in ("III", "IV", "V")]
+    non_nlr_dom_pur = [float(r["pct_fubar_purifying"]) for r in s10c if r["structural_class"] in ("III", "IV", "V") and r["domain_name"] != "whole_gene"]
     nlr_lrr_pur = [float(r["pct_fubar_purifying"]) for r in s10c if r["structural_class"] in ("I", "I/II", "II") and r["domain_name"] == "LRR"]
+    u_fubar_pur, p_fubar_pur = ss.mannwhitneyu(non_nlr_dom_pur, nlr_lrr_pur, alternative="two-sided")
     vals["non_nlr_fubar_pur_mean"] = f"{np.mean(non_nlr_pur):.1f}"
     vals["non_nlr_fubar_pur_sem"] = f"{ss.sem(non_nlr_pur):.1f}"
+    vals["non_nlr_dom_fubar_pur_mean"] = f"{np.mean(non_nlr_dom_pur):.1f}"
+    vals["non_nlr_dom_fubar_pur_sem"] = f"{ss.sem(non_nlr_dom_pur):.1f}"
+    vals["mwu_fubar_pur_U"] = f"{u_fubar_pur:.1f}"
+    vals["mwu_fubar_pur_P"] = f"{p_fubar_pur:.4e}"
     vals["nlr_lrr_fubar_pur_mean"] = f"{np.mean(nlr_lrr_pur):.1f}"
     vals["nlr_lrr_fubar_pur_sem"] = f"{ss.sem(nlr_lrr_pur):.1f}"
+
+    # Non-NLR domain specifics from S10c for exact manuscript filling
+    def _dom_w(og, dname):
+        return next(r["omega_M0"] for r in s10c if r["orthogroup"] == og and r["domain_name"] == dname)
+
+    vals["lr34_nbd_w"] = f"{float(_dom_w('OG0000013', 'ABC_NBD')):.3f}"
+    vals["lr34_tmd_w"] = f"{float(_dom_w('OG0000013', 'ABC2_TMD')):.3f}"
+    vals["lr67_tm_w"] = f"{float(_dom_w('OG0000014', 'Sugar_tr_TM_core')):.4f}"
+    vals["lr9_vwa_w"] = f"{float(_dom_w('OG0000027', 'Accessory_VWA')):.3f}"
+    vals["yr36_k1_w"] = f"{float(_dom_w('OG0000028', 'K1_active')):.4f}"
+    vals["yr36_start_w"] = f"{float(_dom_w('OG0000028', 'Accessory_START')):.4f}"
     
     # Class III module contrasts (S10d)
     vals["tkp_og_n"] = str(len(s10d))
@@ -764,6 +805,9 @@ def step_stats(ctx):
     vals["lr9_k2_w"] = lr9_r["module_2_omega_M0"]
     vals["sr62_k1_w"] = sr62_r["module_1_omega_M0"]
     vals["sr62_k2_w"] = sr62_r["module_2_omega_M0"]
+    sr43_r = next(r for r in s10d if r["orthogroup"] == "OG0000057")
+    vals["sr43_k1_w"] = sr43_r["module_1_omega_M0"]
+    vals["sr43_duf_w"] = sr43_r["module_2_omega_M0"]
     
     # Class I CC-NLR 3D AlphaFold + DSSP surface mapping (n = 11 unique structures in S10e)
     c1_seen = set()
@@ -788,6 +832,7 @@ def step_stats(ctx):
     pooled_or, pooled_p = ss.fisher_exact([[a_p, b_p], [c_p, d_p]], alternative="greater")
     
     vals["classI_struct_n"] = str(len(c1_struct))
+    vals["n_af_unique_models"] = str(len({r["uniprot_id"] for r in s10e}))
     vals["classI_lrr_pos_pct"] = f"{100.0 * tot_lrr_pos / max(1, tot_pos):.1f}"
     vals["classI_lrr_pos_n"] = f"{tot_lrr_pos}/{tot_pos}"
     vals["classI_concave_pos_pct"] = f"{100.0 * tot_concave / max(1, tot_pos):.1f}"
@@ -812,17 +857,21 @@ def step_stats(ctx):
 
 # ----------------------------------------------------------------------------- 10 FIGURE
 def step_figure(ctx):
-    log("=== rust34 step figure (Delegating to base-R stats_and_fig4_3.4.R for publication Fig. 4)")
+    log("=== rust34 step figure (Running R audit stats_and_fig4_3.4.R + publication make_publication_fig4.R)")
     rscript = find_bin("Rscript")
     r_file = STAGE_DIR / "stats_and_fig4_3.4.R"
     if r_file.exists():
-        subprocess.run([rscript, str(r_file)], cwd=str(ctx.ROOT), check=False)
+        subprocess.run([rscript, str(r_file)], cwd=str(ctx.ROOT), check=True)
+    pub_r = STAGE_DIR / "make_publication_fig4.R"
+    if pub_r.exists():
+        subprocess.run([rscript, str(pub_r)], cwd=str(ctx.ROOT), check=True)
+    else:
         for ext in (".pdf", ".png"):
             src = ctx.ROOT / f"figures/Fig4_selection_structures_R{ext}"
             dst = ctx.ROOT / f"figures/Fig4_selection_structures{ext}"
             if src.exists():
                 dst.write_bytes(src.read_bytes())
-        log("saved figures/Fig4_selection_structures.pdf and .png via stats_and_fig4_3.4.R")
+    log("saved figures/Fig4_selection_structures.pdf and .png")
 
 # ----------------------------------------------------------------------------- MAIN
 def main():
