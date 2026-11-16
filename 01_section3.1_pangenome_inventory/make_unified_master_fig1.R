@@ -22,7 +22,7 @@ suppressPackageStartupMessages({
   library(ggtree)
   library(patchwork)
   library(grid)
-  library(cowplot)
+  library(ggtext)
 })
 
 cat("=======================================================================\n")
@@ -449,49 +449,111 @@ p_e <- ggplot(s3b_df, aes(x = Class_Label, y = pct_increase + 1, fill = Class_La
   labs(
     title = "e  Per-locus Miniprot recovery gain across structural classes (n = 36 loci)",
     x = NULL,
-    y = "Homologue recovery gain (log10)"
+    y = "Recovery gain (log10)"
   ) +
   theme_classic(base_size = 9.5) +
   theme(
-    plot.title = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", size = 10, hjust = 0),
+    plot.title.position = "plot",
     axis.text.x = element_text(size = 8.5, face = "bold", color = "black"),
     axis.text.y = element_text(size = 8, color = "black"),
     legend.position = "none"
   )
 
 # ------------------------------------------------------------------------------
-# Panel f: Core-to-Dispensable Waterfall Plot (Image 1c style)
+# Panel f: Core-to-Dispensable Waterfall (56 subgenomes across 27 assemblies)
 # ------------------------------------------------------------------------------
 cat("Step 6/6: Building Panel f (Waterfall plot)...\n")
+
+short_og_name <- function(q) {
+  dplyr::case_when(
+    grepl("Sr21", q) ~ "Sr21/Yr5/Yr7",
+    grepl("Sr33", q) ~ "Sr33/Sr50",
+    grepl("Sr13", q) ~ "Sr13/Sr27",
+    grepl("Rpg1", q) ~ "Rpg1/WTK4 [comp]",
+    grepl("Yr27", q) ~ "Yr27/Lr13",
+    grepl("Sr22", q) ~ "Sr22",
+    q == "YrNAM_Yr10" ~ "YrNAM/Yr10",
+    q == "Yr87-Lr85" ~ "Yr87/Lr85",
+    TRUE ~ q
+  )
+}
+
 og_waterfall <- og_df %>%
   arrange(desc(occupancy_all_subgenomes), desc(n_members)) %>%
   mutate(
     rank = row_number(),
     pct_occupancy = occupancy_all_subgenomes * 100,
-    cloned_marker = case_when(
-      grepl("Lr34", queries) ~ "Lr34 OG (100% Core)",
-      grepl("Yr15", queries) ~ "Yr15 progenitor OG (94.6%)",
-      grepl("Sr60", queries) ~ "Sr60 progenitor OG (94.6%)",
-      grepl("Sr35", queries) ~ "Sr35 (51.8% Shell)",
-      grepl("Yr27", queries) ~ "Yr27 (26.8% Shell)",
-      grepl("Lr10", queries) ~ "Lr10 (17.9% Shell)",
-      grepl("Lr21", queries) ~ "Lr21 (12.5% Cloud)",
-      grepl("Sr26", queries) ~ "Sr26 (7.1% Cloud)",
-      TRUE ~ NA_character_
-    )
+    short_gene = short_og_name(queries),
+    is_landmark = short_gene %in% c("Lr34", "Sr60", "Yr15", "Sr35", "Yr27/Lr13", "Lr10", "Lr21", "Sr26"),
+    y_label = ifelse(
+      is_landmark,
+      sprintf("<b style='color:#b30000;'>%d.<i> %s</i></b>", rank, short_gene),
+      sprintf("<span style='color:#333333;'>%d.<i> %s</i></span>", rank, short_gene)
+    ),
+    Comp_Label = case_when(
+      pct_occupancy >= 95 ~ "Core",
+      pct_occupancy >= 80 ~ "Soft-core",
+      pct_occupancy >= 15 ~ "Shell",
+      TRUE                ~ "Cloud"
+    ),
+    Comp_Label = factor(Comp_Label, levels = c("Core", "Soft-core", "Shell", "Cloud"))
   )
 
 s5d_df <- read.delim(file.path(res_dir, "S5d_subgenome_cnv.tsv"), stringsAsFactors = FALSE) %>%
   mutate(subgenome_id = paste0(asm_id, "__", subgenome)) %>%
   select(orthogroup, subgenome = subgenome_id, intact_copies)
 
+# Map ordered subgenomes to exact integer columns 1..56 and centered 27 assembly ticks
+col_map <- subg_meta %>%
+  filter(subgenome %in% subg_order) %>%
+  mutate(subgenome = factor(subgenome, levels = subg_order)) %>%
+  arrange(subgenome) %>%
+  mutate(x_idx = row_number()) %>%
+  left_join(s2_df %>% select(asm_id, annotation_gff3) %>% distinct(), by = "asm_id")
+
+short_asm_name <- function(a, gff) {
+  nm <- sub("^T(ae|sp)_", "", a)
+  ifelse(gff == "no", paste0(nm, "*"), nm)
+}
+
+asm_ticks <- col_map %>%
+  group_by(Tier, asm_id, annotation_gff3) %>%
+  summarise(
+    x_start = min(x_idx),
+    x_end = max(x_idx),
+    x_mid = mean(x_idx),
+    .groups = "drop"
+  ) %>%
+  arrange(x_start) %>%
+  mutate(
+    lbl = short_asm_name(asm_id, annotation_gff3),
+    lbl_md = ifelse(
+      annotation_gff3 == "no",
+      sprintf("<b style='color:#b30000;'>%s</b>", lbl),
+      sprintf("<span style='color:#222222;'>%s</span>", lbl)
+    )
+  )
+
+tier_bounds <- col_map %>%
+  group_by(Tier) %>%
+  summarise(x_end = max(x_idx), .groups = "drop") %>%
+  arrange(x_end) %>%
+  filter(x_end < nrow(col_map)) %>%
+  pull(x_end) + 0.5
+
+asm_bounds <- asm_ticks %>%
+  filter(x_end < nrow(col_map)) %>%
+  pull(x_end) + 0.5
+asm_bounds <- setdiff(asm_bounds, tier_bounds)
+
 waterfall_long <- pm_df[subg_order, og_waterfall$orthogroup, drop = FALSE] %>%
   as.matrix() %>%
   as.data.frame() %>%
   mutate(subgenome = rownames(pm_df[subg_order, ])) %>%
   pivot_longer(-subgenome, names_to = "orthogroup", values_to = "presence") %>%
-  left_join(subg_meta, by = "subgenome") %>%
-  left_join(og_waterfall %>% select(orthogroup, rank, pct_occupancy, cloned_marker), by = "orthogroup") %>%
+  left_join(col_map %>% select(subgenome, x_idx, Tier), by = "subgenome") %>%
+  left_join(og_waterfall %>% select(orthogroup, rank, pct_occupancy), by = "orthogroup") %>%
   left_join(s5d_df, by = c("orthogroup", "subgenome")) %>%
   mutate(
     cn_val = ifelse(is.na(intact_copies), ifelse(presence > 0, 1L, 0L),
@@ -503,8 +565,7 @@ waterfall_long <- pm_df[subg_order, og_waterfall$orthogroup, drop = FALSE] %>%
       cn_val <= 9   ~ "5-9",
       TRUE          ~ ">=10"
     ),
-    cn_bin = factor(cn_bin, levels = c("0", "1", "2-4", "5-9", ">=10")),
-    subgenome = factor(subgenome, levels = subg_order)
+    cn_bin = factor(cn_bin, levels = c("0", "1", "2-4", "5-9", ">=10"))
   )
 
 cn_cols <- c("0" = "#f0f0f0", "1" = "#bdd7e7", "2-4" = "#6baed6", "5-9" = "#2171b5", ">=10" = "#08306b")
@@ -514,73 +575,138 @@ n_sc   <- sum(og_waterfall$pct_occupancy >= 80)
 n_sh   <- sum(og_waterfall$pct_occupancy >= 15)
 n_tot_og <- nrow(og_waterfall)
 
-tier_strip <- subg_meta %>%
-  mutate(subgenome = factor(subgenome, levels = subg_order))
-
-p_f_strip <- ggplot(tier_strip, aes(x = subgenome, y = 1, fill = Tier)) +
-  geom_tile(color = "white", linewidth = 0.15) +
-  scale_fill_manual(values = pav_colors[names(pav_colors) != "Absent"], name = "Ploidy Tier") +
-  coord_cartesian(xlim = c(-26, 76), clip = "off") +
-  labs(title = sprintf("f  Copy-number-resolved Core-to-Dispensable waterfall (%d OGs x 56 subgenomes)", n_tot_og)) +
+# Top ploidy strip locked strictly to x = 0.5..56.5
+p_f_strip <- ggplot(col_map, aes(x = x_idx, y = 1, fill = Tier)) +
+  geom_tile(width = 1, height = 1, color = "white", linewidth = 0.12) +
+  geom_vline(xintercept = tier_bounds, color = "white", linewidth = 0.9) +
+  scale_fill_manual(values = pav_colors[names(pav_colors) != "Absent"], name = "Ploidy Tier:") +
+  scale_x_continuous(limits = c(0.5, nrow(col_map) + 0.5), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0.5, 1.5), expand = c(0, 0)) +
+  labs(title = sprintf("f  Copy-number-resolved waterfall across 27 assemblies (%d OGs x 56 subgenomes)", n_tot_og)) +
   theme_void(base_size = 9.5) +
   theme(
-    plot.title = element_text(face = "bold", size = 10, hjust = 0),
+    plot.title = element_text(face = "bold", size = 10, hjust = 0, margin = margin(b = 2)),
+    plot.title.position = "plot",
     legend.position = "top",
-    legend.text = element_text(size = 7.2),
-    legend.key.size = unit(0.28, "cm")
+    legend.title = element_text(size = 7.5, face = "bold"),
+    legend.text = element_text(size = 7.0),
+    legend.key.size = unit(0.26, "cm"),
+    legend.margin = margin(t = 0, b = 2),
+    plot.margin = margin(t = 2, r = 1, b = 1, l = 2)
   ) +
   guides(fill = guide_legend(nrow = 1))
 
-callouts <- og_waterfall %>% filter(!is.na(cloned_marker))
-
-p_f_main <- ggplot() +
-  geom_tile(data = waterfall_long, aes(x = subgenome, y = rank, fill = cn_bin), linewidth = 0.1) +
-  scale_fill_manual(values = cn_cols, name = "Intact Copies") +
-  scale_y_reverse(breaks = c(1, 10, 20, n_tot_og), expand = expansion(mult = c(0.01, 0.02))) +
-  geom_hline(yintercept = n_core + 0.5, linetype = "dashed", color = "black", linewidth = 0.6) +
-  geom_hline(yintercept = n_sc + 0.5, linetype = "dotted", color = "black", linewidth = 0.4) +
-  geom_hline(yintercept = n_sh + 0.5, linetype = "dashed", color = "black", linewidth = 0.6) +
-  annotate("text", x = 58, y = max(1, n_core / 2), label = "} Core (>=95%)", hjust = 0, size = 2.6, fontface = "bold", color = "#1b7837") +
-  annotate("text", x = 58, y = (n_core + n_sc + 1) / 2, label = "} Soft-core (80-94%)", hjust = 0, size = 2.5, fontface = "bold", color = "#7fbf7b") +
-  annotate("text", x = 58, y = (n_sc + n_sh + 1) / 2, label = "} Shell (15-79%)", hjust = 0, size = 2.6, fontface = "bold", color = "#fdb863") +
-  annotate("text", x = 58, y = (n_sh + n_tot_og + 1) / 2, label = "} Cloud (<15%)", hjust = 0, size = 2.6, fontface = "bold", color = "#e66101") +
-  geom_segment(data = callouts, aes(x = -0.5, xend = -4.0, y = rank, yend = rank),
-               arrow = arrow(length = unit(0.10, "cm"), ends = "first", type = "closed"),
-               color = "#b30000", linewidth = 0.5) +
-  geom_text(data = callouts, aes(x = -4.5, y = rank, label = cloned_marker),
-            hjust = 1, size = 2.2, fontface = "bold.italic", color = "#b30000") +
-  coord_cartesian(xlim = c(-26, 76), clip = "off") +
+# Main 31 x 56 copy-number heatmap locked strictly to x = 0.5..56.5, y = 31.5..0.5
+p_f_main <- ggplot(waterfall_long, aes(x = x_idx, y = rank, fill = cn_bin)) +
+  geom_tile(width = 1, height = 1, color = "white", linewidth = 0.08) +
+  geom_vline(xintercept = asm_bounds, color = "grey78", linewidth = 0.22) +
+  geom_vline(xintercept = tier_bounds, color = "#222222", linewidth = 0.55) +
+  geom_hline(yintercept = c(n_core + 0.5, n_sc + 0.5, n_sh + 0.5),
+             linetype = c("dashed", "dotted", "dashed"), color = "#111111", linewidth = 0.45) +
+  scale_fill_manual(values = cn_cols, name = "Intact Copies:") +
+  scale_x_continuous(
+    limits = c(0.5, nrow(col_map) + 0.5),
+    expand = c(0, 0),
+    breaks = asm_ticks$x_mid,
+    labels = asm_ticks$lbl_md
+  ) +
+  scale_y_reverse(
+    limits = c(n_tot_og + 0.5, 0.5),
+    expand = c(0, 0),
+    breaks = og_waterfall$rank,
+    labels = og_waterfall$y_label
+  ) +
   labs(
-    x = "56 haploid subgenomes sorted by evolutionary tier",
-    y = "Orthogroup Rank (Ordered by Subgenome Occupancy)"
+    x = "27 Triticeae assemblies sorted by ploidy tier (* = 11 genome-only assemblies absent from a-b)",
+    y = NULL
   ) +
-  theme_classic(base_size = 9.5) +
+  theme_classic(base_size = 9.0) +
   theme(
-    axis.title.y = element_text(size = 9, face = "bold", color = "black", margin = margin(r = 3)),
-    axis.title.x = element_text(size = 9, face = "bold", color = "black", margin = margin(t = 4)),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank(),
-    axis.text.y = element_text(size = 8, color = "black"),
+    axis.line = element_line(linewidth = 0.4, color = "black"),
+    axis.ticks = element_line(linewidth = 0.35, color = "black"),
+    axis.ticks.length = unit(0.08, "cm"),
+    axis.text.y = ggtext::element_markdown(size = 6.2, hjust = 1, margin = margin(r = 2)),
+    axis.text.x = ggtext::element_markdown(size = 5.8, angle = 90, hjust = 1, vjust = 0.5),
+    axis.title.x = element_text(size = 8.2, face = "bold", color = "black", margin = margin(t = 3)),
     legend.position = "bottom",
-    legend.text = element_text(size = 7.5),
-    legend.key.size = unit(0.3, "cm")
+    legend.title = element_text(size = 7.5, face = "bold"),
+    legend.text = element_text(size = 7.2),
+    legend.key.size = unit(0.28, "cm"),
+    legend.margin = margin(t = 1, b = 0),
+    plot.margin = margin(t = 0, r = 2, b = 2, l = 2)
   ) +
   guides(fill = guide_legend(nrow = 1))
 
-p_f <- p_f_strip / p_f_main + plot_layout(heights = c(0.08, 1.0))
+# Aligned right-hand occupancy (%) + compartment bracket track (0..100%)
+comp_brackets <- data.frame(
+  Comp_Label = factor(c("Core", "Soft-core", "Shell", "Cloud"), levels = c("Core", "Soft-core", "Shell", "Cloud")),
+  ymin = c(1 - 0.35, n_core + 1 - 0.35, n_sc + 1 - 0.35, n_sh + 1 - 0.35),
+  ymax = c(n_core + 0.35, n_sc + 0.35, n_sh + 0.35, n_tot_og + 0.35),
+  ymid = c((1 + n_core) / 2, (n_core + 1 + n_sc) / 2, (n_sc + 1 + n_sh) / 2, (n_sh + 1 + n_tot_og) / 2),
+  txt = c(
+    sprintf("Core (%d)", n_core),
+    sprintf("Soft-core (%d)", n_sc - n_core),
+    sprintf("Shell (%d)", n_sh - n_sc),
+    sprintf("Cloud (%d)", n_tot_og - n_sh)
+  )
+)
+
+p_f_occ <- ggplot(og_waterfall, aes(y = rank, x = pct_occupancy, fill = Comp_Label)) +
+  geom_vline(xintercept = c(15, 80, 95), linetype = "dashed", color = "#999999", linewidth = 0.3) +
+  geom_rect(aes(xmin = 0, xmax = pct_occupancy, ymin = rank - 0.36, ymax = rank + 0.36),
+            color = "black", linewidth = 0.12) +
+  geom_hline(yintercept = c(n_core + 0.5, n_sc + 0.5, n_sh + 0.5),
+             linetype = c("dashed", "dotted", "dashed"), color = "#111111", linewidth = 0.45) +
+  geom_segment(data = comp_brackets,
+               aes(x = 104, xend = 104, y = ymin, yend = ymax, color = Comp_Label),
+               inherit.aes = FALSE, linewidth = 1.6, show.legend = FALSE) +
+  geom_text(data = comp_brackets,
+            aes(x = 107, y = ymid, label = txt, color = Comp_Label),
+            inherit.aes = FALSE, hjust = 0, size = 2.35, fontface = "bold", show.legend = FALSE) +
+  scale_fill_manual(values = compartment_colors, guide = "none") +
+  scale_color_manual(values = compartment_colors, guide = "none") +
+  scale_x_continuous(limits = c(0, 160), breaks = c(0, 50, 100), labels = c("0", "50", "100%"), expand = c(0, 0)) +
+  scale_y_reverse(limits = c(n_tot_og + 0.5, 0.5), expand = c(0, 0)) +
+  labs(x = "Occupancy (%)", y = NULL) +
+  theme_classic(base_size = 9.0) +
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.line.x = element_line(linewidth = 0.4, color = "black"),
+    axis.ticks.x = element_line(linewidth = 0.35, color = "black"),
+    axis.text.x = element_text(size = 7.0, color = "black"),
+    axis.title.x = element_text(size = 8.0, face = "bold", color = "black", margin = margin(t = 3)),
+    plot.margin = margin(t = 0, r = 4, b = 2, l = 1)
+  )
 
 # ------------------------------------------------------------------------------
-# Composing the Unified Master Layout
+# Composing the Unified Master Layout (100% pure patchwork)
 # ------------------------------------------------------------------------------
 cat("Composing unified layout with patchwork...\n")
 
 top_left <- (p_a | p_b) + plot_layout(widths = c(1.22, 0.88))
 bot_left <- (p_c | p_d)
-left_col <- top_left / bot_left + plot_layout(heights = c(1.28, 0.82))
-right_col <- cowplot::plot_grid(p_e, p_f, ncol = 1, rel_heights = c(0.45, 1.0))
+left_col <- (top_left / bot_left) + plot_layout(heights = c(1.26, 0.84))
 
-master_fig1 <- (left_col | right_col) + 
-  plot_layout(widths = c(1.15, 1.0))
+right_design <- "
+  AA
+  BC
+  DE
+"
+right_col <- wrap_plots(
+  A = p_e + theme(plot.title.position = "plot"),
+  B = p_f_strip,
+  C = plot_spacer(),
+  D = p_f_main,
+  E = p_f_occ,
+  design = right_design,
+  widths = c(1.0, 0.38),
+  heights = c(0.40, 0.045, 1.0)
+)
+
+master_fig1 <- (left_col | right_col) +
+  plot_layout(widths = c(1.12, 1.06))
 
 out_pdf <- file.path(fig_dir, "Fig1_unified_master_publication.pdf")
 out_png <- file.path(fig_dir, "Fig1_unified_master_publication.png")
